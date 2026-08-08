@@ -40,7 +40,7 @@ class BaseAgent:
         """Get average confidence over recent history."""
         if len(self.confidence_history) == 0:
             return 0.5
-        return np.mean(self.confidence_history[-20:])
+        return float(np.mean(self.confidence_history[-20:]))
     
     def reset(self):
         """Reset agent state."""
