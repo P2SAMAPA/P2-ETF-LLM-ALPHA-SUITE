@@ -61,8 +61,8 @@ class PatternAgent(BaseAgent):
         confidence = min(0.8, 0.4 + 0.1 * len(signals))
         
         return {
-            "signal": np.clip(avg_signal, -1, 1),
-            "confidence": confidence,
+            "signal": float(np.clip(avg_signal, -1, 1)),
+            "confidence": float(confidence),
             "reasoning": "; ".join(reasons) if reasons else "No clear pattern"
         }
     
