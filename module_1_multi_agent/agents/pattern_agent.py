@@ -6,6 +6,7 @@ Detects chart patterns: head & shoulders, flags, triangles, wedges.
 """
 
 import numpy as np
+from typing import Dict
 from .base_agent import BaseAgent
 
 
@@ -21,8 +22,6 @@ class PatternAgent(BaseAgent):
         prices = data.get("prices", [])
         if len(prices) < 60:
             return {"signal": 0, "confidence": 0.3, "reasoning": "Insufficient data"}
-        
-        returns = np.log(prices / np.roll(prices, 1))[1:]
         
         signals = []
         reasons = []
@@ -69,7 +68,6 @@ class PatternAgent(BaseAgent):
     
     def _detect_head_shoulders(self, prices: np.ndarray) -> float:
         """Detect head and shoulders pattern."""
-        # Simplified: check for three peaks with middle highest
         if len(prices) < 40:
             return 0
         
@@ -85,18 +83,16 @@ class PatternAgent(BaseAgent):
         # Check for head and shoulders pattern
         for i in range(len(peaks) - 2):
             p1, p2, p3 = peaks[i], peaks[i+1], peaks[i+2]
-            # Middle peak should be highest
             if p2[1] > p1[1] and p2[1] > p3[1]:
-                # Shoulders should be roughly equal
-                if abs(p1[1] - p3[1]) / p1[1] < 0.05:
-                    return -0.7  # Bearish pattern
+                if abs(p1[1] - p3[1]) / (p1[1] + 1e-6) < 0.05:
+                    return -0.7
         
         # Inverse head and shoulders (bullish)
         for i in range(len(peaks) - 2):
             p1, p2, p3 = peaks[i], peaks[i+1], peaks[i+2]
             if p2[1] < p1[1] and p2[1] < p3[1]:
-                if abs(p1[1] - p3[1]) / p1[1] < 0.05:
-                    return 0.7  # Bullish pattern
+                if abs(p1[1] - p3[1]) / (p1[1] + 1e-6) < 0.05:
+                    return 0.7
         
         return 0
     
@@ -105,7 +101,6 @@ class PatternAgent(BaseAgent):
         if len(prices) < 30:
             return 0
         
-        # Check for sharp move followed by consolidation
         recent = prices[-30:]
         first_third = recent[:10]
         last_two_third = recent[10:]
@@ -113,8 +108,7 @@ class PatternAgent(BaseAgent):
         first_range = np.max(first_third) - np.min(first_third)
         second_range = np.max(last_two_third) - np.min(last_two_third)
         
-        if first_range > 0 and second_range / first_range < 0.5:
-            # Direction: if first move was up
+        if first_range > 0 and second_range / (first_range + 1e-6) < 0.5:
             if first_third[-1] > first_third[0]:
                 return 0.6
             else:
@@ -127,7 +121,6 @@ class PatternAgent(BaseAgent):
         if len(prices) < 30:
             return 0
         
-        # Check for converging highs and lows
         recent = prices[-30:]
         highs = []
         lows = []
@@ -141,18 +134,14 @@ class PatternAgent(BaseAgent):
         if len(highs) < 3 or len(lows) < 3:
             return 0
         
-        # Check if highs and lows are converging
-        high_slope = (highs[-1] - highs[0]) / len(highs)
-        low_slope = (lows[-1] - lows[0]) / len(lows)
+        high_slope = (highs[-1] - highs[0]) / (len(highs) + 1e-6)
+        low_slope = (lows[-1] - lows[0]) / (len(lows) + 1e-6)
         
         if high_slope < 0 and low_slope > 0:
-            # Symmetrical triangle - breakout direction uncertain
             return 0.3
         elif high_slope < 0 and low_slope < 0:
-            # Descending triangle - bearish
             return -0.5
         elif high_slope > 0 and low_slope > 0:
-            # Ascending triangle - bullish
             return 0.5
         
         return 0
@@ -175,14 +164,12 @@ class PatternAgent(BaseAgent):
         if len(highs) < 2 or len(lows) < 2:
             return 0
         
-        high_slope = (highs[-1] - highs[0]) / len(highs)
-        low_slope = (lows[-1] - lows[0]) / len(lows)
+        high_slope = (highs[-1] - highs[0]) / (len(highs) + 1e-6)
+        low_slope = (lows[-1] - lows[0]) / (len(lows) + 1e-6)
         
         if high_slope > 0 and low_slope > 0 and high_slope > low_slope:
-            # Rising wedge - bearish
             return -0.6
         elif high_slope < 0 and low_slope < 0 and high_slope < low_slope:
-            # Falling wedge - bullish
             return 0.6
         
         return 0
