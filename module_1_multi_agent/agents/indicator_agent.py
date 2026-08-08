@@ -6,7 +6,6 @@ Analyzes technical indicators: RSI, MACD, Bollinger Bands.
 """
 
 import numpy as np
-import pandas as pd
 from .base_agent import BaseAgent
 
 
