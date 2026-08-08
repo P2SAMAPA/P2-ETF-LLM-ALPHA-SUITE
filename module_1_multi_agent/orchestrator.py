@@ -7,11 +7,11 @@ Coordinates all agents, aggregates signals, and produces final decisions.
 
 import numpy as np
 from typing import Dict, List, Optional
-from agents.indicator_agent import IndicatorAgent
-from agents.pattern_agent import PatternAgent
-from agents.trend_agent import TrendAgent
-from agents.risk_agent import RiskAgent
-from agents.sentiment_agent import SentimentAgent
+from .agents.indicator_agent import IndicatorAgent
+from .agents.pattern_agent import PatternAgent
+from .agents.trend_agent import TrendAgent
+from .agents.risk_agent import RiskAgent
+from .agents.sentiment_agent import SentimentAgent
 
 
 class AgentOrchestrator:
