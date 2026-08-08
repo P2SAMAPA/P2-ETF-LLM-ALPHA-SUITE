@@ -6,7 +6,6 @@ Assesses risk: volatility, drawdown, VaR, tail risk.
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict
 from .base_agent import BaseAgent
 
@@ -60,11 +59,19 @@ class RiskAgent(BaseAgent):
         
         # Tail Risk (kurtosis)
         if "tail_risk" in self.features and len(returns) > 20:
-            kurtosis = pd.Series(returns[-60:]).kurtosis() if len(returns) >= 60 else 0
-            tail_signal = -np.clip(kurtosis / 5, -1, 1)
+            # Use scipy if available, otherwise simple calculation
+            try:
+                from scipy.stats import kurtosis
+                kurt = kurtosis(returns[-60:])
+            except:
+                mean = np.mean(returns[-60:])
+                std = np.std(returns[-60:])
+                kurt = np.mean(((returns[-60:] - mean) / (std + 1e-6)) ** 4) - 3
+            
+            tail_signal = -np.clip(kurt / 5, -1, 1)
             signals.append(tail_signal)
             confidences.append(0.5 + 0.3 * abs(tail_signal))
-            reasons.append(f"Kurtosis: {kurtosis:.2f}")
+            reasons.append(f"Kurtosis: {kurt:.2f}")
         
         if not signals:
             return {"signal": 0, "confidence": 0.3, "reasoning": "Insufficient data"}
@@ -73,7 +80,7 @@ class RiskAgent(BaseAgent):
         avg_confidence = np.mean(confidences)
         
         return {
-            "signal": np.clip(avg_signal, -1, 1),
-            "confidence": avg_confidence,
+            "signal": float(np.clip(avg_signal, -1, 1)),
+            "confidence": float(avg_confidence),
             "reasoning": "; ".join(reasons) if reasons else "No clear risk signal"
         }
