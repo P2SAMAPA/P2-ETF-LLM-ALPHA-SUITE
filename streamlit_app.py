@@ -129,7 +129,7 @@ def load_json_from_hf(path):
 st.sidebar.markdown("## 🧠 LLM Alpha Suite")
 st.sidebar.markdown(f"**Next Trading Day**")
 st.sidebar.markdown(f"`{next_trading_day()}`")
-st.sidebar.markdown(f"**Window:** {config.PRIMARY_WINDOW}d")
+st.sidebar.markdown(f"**Windows:** {config.WINDOWS}")
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Modules:**")
 st.sidebar.markdown("  • Multi-Agent Discovery")
@@ -166,7 +166,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Run date:** `{data1.get('run_date','?')}`")
 st.sidebar.success(f"✅ {len(data1.get('universes', {}))} universes")
 
-tab1, tab2 = st.tabs(["🏆 Top Buys & Sells", "🔍 Full Rankings"])
+tab1, tab2 = st.tabs(["🏆 Top Buys & Sells", "🔍 Explore by Window"])
 
 UNIVERSE_ORDER = ["FI_COMMODITIES", "EQUITY_SECTORS", "COMBINED"]
 UNIVERSE_LABELS = {
@@ -179,7 +179,7 @@ ntd = next_trading_day()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1
+# TAB 1 - TOP BUYS & SELLS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab1:
     st.header("🏆 Top ETFs — LLM Alpha Suite Signals")
@@ -262,6 +262,10 @@ with tab1:
                     rows.append({
                         "ETF": t,
                         "z-score": round(z, 4),
+                        "Best Window": info.get("window", "N/A"),
+                        "Agent Signal": round(safe_float(info.get("agent_signal", 0)), 4),
+                        "Alpha Signal": round(safe_float(info.get("alpha_signal", 0)), 4),
+                        "RL Signal": round(safe_float(info.get("rl_signal", 0)), 4),
                         "Action": info.get("action", "HOLD")
                     })
                 df_rank = pd.DataFrame(rows).sort_values("z-score", ascending=False)
@@ -290,54 +294,111 @@ with tab1:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2
+# TAB 2 - EXPLORE BY WINDOW
 # ══════════════════════════════════════════════════════════════════════════════
 with tab2:
-    st.header("🔍 Full Rankings — All Modules Combined")
+    st.header("🔍 Explore by Window — All Windows Available")
 
     if not data2:
-        st.warning("Full rankings not found.")
+        st.warning("Window-level data not found. Re-run trainer.")
         st.stop()
 
+    # ── Get all available windows ────────────────────────────────────────────
+    all_wins = set()
+    for ud in data2.get("universes", {}).values():
+        all_wins.update(ud.get("windows", {}).keys())
+    win_options = sorted([int(w) for w in all_wins])
+
+    if not win_options:
+        st.error("No window data available.")
+        st.stop()
+
+    win_labels = {
+        63: "63d  (~3 months) — Short-term",
+        126: "126d (~6 months) — Medium-term",
+        252: "252d (~1 year) — Core Signal",
+        504: "504d (~2 years) — Long-term",
+    }
+
+    # ── Window selector ──────────────────────────────────────────────────────
+    default_idx = win_options.index(252) if 252 in win_options else 0
+    selected_win = st.selectbox(
+        "Select lookback window",
+        options=win_options,
+        index=default_idx,
+        format_func=lambda w: win_labels.get(w, f"{w}d"),
+    )
+    win_key = str(selected_win)
+
+    with st.expander("ℹ️ Window guidance", expanded=False):
+        st.markdown("""
+- **63d** — Short-term signals: captures recent market dynamics
+- **126d** — Medium-term signals: balances noise and responsiveness
+- **252d** — Annual signals: recommended primary for core positions
+- **504d** — Long-term signals: structural regime identification
+        """)
+
+    st.markdown(f"### LLM Alpha Suite Rankings at **{win_labels.get(selected_win, f'{selected_win}d')}** window")
+
     for universe_name in UNIVERSE_ORDER:
-        uni_data = data2.get("universes", {}).get(universe_name, {})
-        ranking = uni_data.get("full_ranking", [])
-
-        if not ranking:
-            continue
-
         label = UNIVERSE_LABELS.get(universe_name, universe_name)
+        uni_data = data2.get("universes", {}).get(universe_name, {})
+        win_data = uni_data.get("windows", {}).get(win_key)
+
         st.markdown(f'<div class="uni-title">{label}</div>', unsafe_allow_html=True)
 
-        rows = []
-        for item in ranking:
-            rows.append({
-                "ETF": item[0],
-                "z-score": round(item[1], 4),
-                "Action": item[2]
-            })
+        if not win_data:
+            st.info(f"No data for {universe_name} at {selected_win}d.")
+            st.divider()
+            continue
 
-        df = pd.DataFrame(rows).sort_values("z-score", ascending=False)
-        df.insert(0, "Rank", range(1, len(df) + 1))
+        # ── TOP BUYS ──────────────────────────────────────────────────────────
+        top_buys = win_data.get("top_buys", [])
+        if top_buys:
+            cols = st.columns(3)
+            for idx, etf in enumerate(top_buys[:3]):
+                ticker = etf["ticker"]
+                z_score = safe_float(etf.get("z_score", 0))
+                action = get_action(z_score)
 
-        styled_df = df.style.map(
-            lambda x: 'background-color: #27ae60; color: white;' if isinstance(x, (int, float)) and x > 0.15 else '',
-            subset=['z-score']
-        ).map(
-            lambda x: 'background-color: #2ecc71; color: white;' if isinstance(x, (int, float)) and 0.05 < x <= 0.15 else '',
-            subset=['z-score']
-        ).map(
-            lambda x: 'background-color: #f1c40f; color: black;' if isinstance(x, (int, float)) and -0.05 < x <= 0.05 else '',
-            subset=['z-score']
-        ).map(
-            lambda x: 'background-color: #e67e22; color: white;' if isinstance(x, (int, float)) and -0.15 < x <= -0.05 else '',
-            subset=['z-score']
-        ).map(
-            lambda x: 'background-color: #e74c3c; color: white;' if isinstance(x, (int, float)) and x <= -0.15 else '',
-            subset=['z-score']
-        )
+                with cols[idx]:
+                    st.markdown(f"""
+<div class="win-card">
+  <div class="ticker">⭐ {ticker}</div>
+  <div class="score">z-score = {z_score:+.3f}</div>
+  <div class="score">{action_badge(action)}</div>
+  <div class="next-day">window = {selected_win}d · 📅 {ntd}</div>
+</div>
+""", unsafe_allow_html=True)
+        else:
+            st.info("No BUY signals at this window")
 
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        # ── FULL RANKING TABLE ──────────────────────────────────────────────
+        with st.expander(f"📋 Full ranking — {label} @ {selected_win}d"):
+            rows = win_data.get("full_ranking", [])
+            if rows:
+                df_win = pd.DataFrame(rows)
+                df_win.columns = ["ETF", "z-score", "Action"]
+                df_win.insert(0, "Rank", range(1, len(df_win) + 1))
+
+                styled_df = df_win.style.map(
+                    lambda x: 'background-color: #27ae60; color: white;' if isinstance(x, (int, float)) and x > 0.15 else '',
+                    subset=['z-score']
+                ).map(
+                    lambda x: 'background-color: #2ecc71; color: white;' if isinstance(x, (int, float)) and 0.05 < x <= 0.15 else '',
+                    subset=['z-score']
+                ).map(
+                    lambda x: 'background-color: #f1c40f; color: black;' if isinstance(x, (int, float)) and -0.05 < x <= 0.05 else '',
+                    subset=['z-score']
+                ).map(
+                    lambda x: 'background-color: #e67e22; color: white;' if isinstance(x, (int, float)) and -0.15 < x <= -0.05 else '',
+                    subset=['z-score']
+                ).map(
+                    lambda x: 'background-color: #e74c3c; color: white;' if isinstance(x, (int, float)) and x <= -0.15 else '',
+                    subset=['z-score']
+                )
+                st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
         st.divider()
 
-    st.caption(f"Run date: {data2.get('run_date','?')} · Green = BUY · Yellow = HOLD · Red = SELL")
+    st.caption(f"Window: {selected_win}d · Run date: {data2.get('run_date','?')} · Green = BUY · Yellow = HOLD · Red = SELL")
