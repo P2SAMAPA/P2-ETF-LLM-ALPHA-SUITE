@@ -6,6 +6,8 @@ Analyzes trends: momentum, moving averages, trend strength.
 """
 
 import numpy as np
+import pandas as pd
+from typing import Dict
 from .base_agent import BaseAgent
 
 
@@ -75,11 +77,9 @@ class TrendAgent(BaseAgent):
         if len(returns) < 14:
             return 0
         
-        # Directional movement
         pos_movement = np.maximum(0, returns)
         neg_movement = np.maximum(0, -returns)
         
-        # Average directional movement
         atr = np.mean(np.abs(returns[-14:]))
         
         if atr == 0:
@@ -88,8 +88,6 @@ class TrendAgent(BaseAgent):
         di_pos = np.mean(pos_movement[-14:]) / atr
         di_neg = np.mean(neg_movement[-14:]) / atr
         
-        # Directional index
         dx = abs(di_pos - di_neg) / (di_pos + di_neg + 1e-6)
-        adx = dx  # Simplified
         
-        return adx
+        return dx
