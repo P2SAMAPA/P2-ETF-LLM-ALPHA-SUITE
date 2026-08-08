@@ -6,7 +6,6 @@ Analyzes trends: momentum, moving averages, trend strength.
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict
 from .base_agent import BaseAgent
 
@@ -67,8 +66,8 @@ class TrendAgent(BaseAgent):
         avg_confidence = np.mean(confidences)
         
         return {
-            "signal": np.clip(avg_signal, -1, 1),
-            "confidence": avg_confidence,
+            "signal": float(np.clip(avg_signal, -1, 1)),
+            "confidence": float(avg_confidence),
             "reasoning": "; ".join(reasons) if reasons else "No clear trend"
         }
     
@@ -90,4 +89,4 @@ class TrendAgent(BaseAgent):
         
         dx = abs(di_pos - di_neg) / (di_pos + di_neg + 1e-6)
         
-        return dx
+        return float(dx)
