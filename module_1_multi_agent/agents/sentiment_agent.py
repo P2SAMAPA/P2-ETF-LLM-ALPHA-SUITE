@@ -6,7 +6,6 @@ Analyzes market sentiment: put/call ratio, fear/greed, volatility skew.
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict
 from .base_agent import BaseAgent
 
@@ -48,7 +47,14 @@ class SentimentAgent(BaseAgent):
         
         # Volatility skew (using return distribution)
         if "volatility_skew" in self.features and len(returns) > 20:
-            skew = pd.Series(returns[-60:]).skew() if len(returns) >= 60 else 0
+            # Calculate skewness
+            if len(returns) >= 60:
+                mean = np.mean(returns[-60:])
+                std = np.std(returns[-60:])
+                skew = np.mean(((returns[-60:] - mean) / (std + 1e-6)) ** 3)
+            else:
+                skew = 0
+            
             skew_signal = -np.clip(skew, -1, 1)
             signals.append(skew_signal)
             confidences.append(0.5 + 0.3 * abs(skew_signal))
@@ -61,7 +67,7 @@ class SentimentAgent(BaseAgent):
         avg_confidence = np.mean(confidences)
         
         return {
-            "signal": np.clip(avg_signal, -1, 1),
-            "confidence": avg_confidence,
+            "signal": float(np.clip(avg_signal, -1, 1)),
+            "confidence": float(avg_confidence),
             "reasoning": "; ".join(reasons) if reasons else "No clear sentiment"
         }
