@@ -6,6 +6,7 @@ Analyzes technical indicators: RSI, MACD, Bollinger Bands.
 """
 
 import numpy as np
+from typing import Dict
 from .base_agent import BaseAgent
 
 
@@ -83,8 +84,8 @@ class IndicatorAgent(BaseAgent):
         self.confidence_history.append(avg_confidence)
         
         return {
-            "signal": avg_signal,
-            "confidence": avg_confidence,
+            "signal": float(avg_signal),
+            "confidence": float(avg_confidence),
             "reasoning": "; ".join(reasons[:3]) if reasons else "No clear signal"
         }
     
@@ -104,7 +105,7 @@ class IndicatorAgent(BaseAgent):
         
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
-        return rsi
+        return float(rsi)
     
     def _compute_macd(self, returns: np.ndarray) -> float:
         """Compute MACD signal."""
@@ -119,7 +120,9 @@ class IndicatorAgent(BaseAgent):
         # Signal line: 9-day EMA of MACD
         signal = self._ema(macd, 9)
         
-        return macd[-1] - signal[-1]
+        if len(macd) > 0 and len(signal) > 0:
+            return float(macd[-1] - signal[-1])
+        return 0
     
     def _ema(self, data: np.ndarray, period: int) -> np.ndarray:
         """Compute EMA."""
@@ -149,8 +152,8 @@ class IndicatorAgent(BaseAgent):
         current = prices[-1]
         
         if current < lower:
-            return 1  # Buy signal (oversold)
+            return 1.0  # Buy signal (oversold)
         elif current > upper:
-            return -1  # Sell signal (overbought)
+            return -1.0  # Sell signal (overbought)
         else:
-            return 0  # Neutral
+            return 0.0  # Neutral
