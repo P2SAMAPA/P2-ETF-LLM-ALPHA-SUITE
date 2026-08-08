@@ -6,6 +6,8 @@ Assesses risk: volatility, drawdown, VaR, tail risk.
 """
 
 import numpy as np
+import pandas as pd
+from typing import Dict
 from .base_agent import BaseAgent
 
 
@@ -31,7 +33,6 @@ class RiskAgent(BaseAgent):
         # Volatility
         if "volatility" in self.features:
             vol = np.std(returns[-20:])
-            # Low volatility = favorable (buy signal)
             vol_signal = -np.clip(vol * 50, -1, 1)
             signals.append(vol_signal)
             confidences.append(0.5 + 0.3 * abs(vol_signal))
@@ -42,9 +43,8 @@ class RiskAgent(BaseAgent):
             cum_returns = np.cumsum(returns[-60:])
             running_max = np.maximum.accumulate(cum_returns)
             drawdown = running_max - cum_returns
-            max_dd = np.max(drawdown)
+            max_dd = np.max(drawdown) if len(drawdown) > 0 else 0
             
-            # High drawdown = unfavorable (sell signal)
             dd_signal = -np.clip(max_dd * 5, -1, 1)
             signals.append(dd_signal)
             confidences.append(0.5 + 0.3 * abs(dd_signal))
@@ -53,7 +53,6 @@ class RiskAgent(BaseAgent):
         # VaR
         if "var" in self.features and len(returns) > 20:
             var_95 = np.percentile(returns[-60:], 5)
-            # High VaR = unfavorable
             var_signal = -np.clip(var_95 * 100, -1, 1)
             signals.append(var_signal)
             confidences.append(0.5 + 0.3 * abs(var_signal))
@@ -61,8 +60,7 @@ class RiskAgent(BaseAgent):
         
         # Tail Risk (kurtosis)
         if "tail_risk" in self.features and len(returns) > 20:
-            kurtosis = pd.Series(returns[-60:]).kurtosis()
-            # High kurtosis = tail risk
+            kurtosis = pd.Series(returns[-60:]).kurtosis() if len(returns) >= 60 else 0
             tail_signal = -np.clip(kurtosis / 5, -1, 1)
             signals.append(tail_signal)
             confidences.append(0.5 + 0.3 * abs(tail_signal))
